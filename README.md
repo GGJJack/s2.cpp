@@ -23,26 +23,15 @@ The engine runs the full pipeline: text → tokens → Slow-AR transformer (with
 
 ---
 
-## What's new (March 2025)
-
-- **posix_fadvise(DONTNEED)** after weight loading: the kernel now drops the GGUF file from page cache once weights are mapped to VRAM, eliminating the RAM == VRAM duplication that was previously observed
-- **Extended CLI sampling controls**: `-max-tokens N`, `-temp F`, `-top-p F`, `-top-k N` — generation length and sampling parameters are now fully configurable at runtime (previously `-max-tokens` was hardcoded at 512)
-- **Correct GGUF architecture string**: the model architecture is now `fish-speech` throughout (was incorrectly tagged `fish-speech-dual-ar` in earlier exports)
-- **Unified GGUF format**: dual-AR transformer + audio codec merged into a single `.gguf` file; slow-AR duplicate tensors from earlier builds have been removed (previously caused apparent 9B param count instead of the correct 4.56B)
-
----
-
 ## Model variants
 
-GGUF files must be obtained separately (not distributed in this repo due to size).
+GGUF files are available at [rodrigomt/s2-pro-gguf](https://huggingface.co/rodrigomt/s2-pro-gguf) on Hugging Face.
 
 | File | Size | Notes |
 |---|---|---|
 | `s2-pro-f16.gguf` | 9.3 GB | Full precision — reference quality |
 | `s2-pro-q8_0.gguf` | 5.7 GB | Near-lossless — recommended for 8+ GB VRAM |
 | `s2-pro-q6_k.gguf` | 4.8 GB | Good quality/size balance — recommended for 6+ GB VRAM |
-
-> **Note:** Q4 and Q5 variants (Q4_0, Q5_0, Q4_K_M, Q5_K, Q5_K_M) produced degraded audio during testing and are not distributed. Only f16, q8_0, and q6_k are verified working.
 
 All variants include both the transformer weights and the audio codec in a single file.
 
@@ -198,7 +187,6 @@ The C++ engine (`src/`) is built entirely on [ggml](https://github.com/ggml-org/
 - No streaming output — WAV is written only after full generation completes
 - No batch inference
 - Voice cloning quality depends heavily on reference audio length and SNR
-- Q4/Q5 quantization formats are currently broken (wrong asymmetric quantization formula) — only f16, q8_0, and q6_k are usable
 - Tested only on Linux/AMD Vulkan (RADV); NVIDIA and macOS are untested
 
 ---
