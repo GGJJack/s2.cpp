@@ -13,7 +13,7 @@ bool Pipeline::init(const PipelineParams & params) {
         return false;
     }
 
-    if (!model_.load(params.model_path, params.vulkan_device)) {
+    if (!model_.load(params.model_path, params.npu_device)) {
         std::cerr << "Pipeline error: could not load model from " << params.model_path << std::endl;
         return false;
     }

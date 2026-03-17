@@ -95,12 +95,18 @@ SlowARModel::~SlowARModel() {
 // load()
 // ---------------------------------------------------------------------------
 
-bool SlowARModel::load(const std::string & gguf_path, int32_t vulkan_device) {
-    if (vulkan_device >= 0) {
+bool SlowARModel::load(const std::string & gguf_path, int32_t npu_device) {
+    if (npu_device >= 0) {
+
 #ifdef GGML_USE_VULKAN
-        backend_ = ggml_backend_vk_init(static_cast<size_t>(vulkan_device));
+        backend_ = ggml_backend_vk_init(static_cast<size_t>(npu_device));
         if (!backend_) {
             std::cerr << "[Model] Vulkan init failed, falling back to CPU." << std::endl;
+        }
+#elif defined GGML_USE_CUDA
+        backend_ = ggml_backend_cuda_init(static_cast<size_t>(npu_device));
+        if (!backend_) {
+            std::cerr << "[Model] Cuda init failed, falling back to CPU." << std::endl;
         }
 #else
         std::cerr << "[Model] Vulkan not compiled, falling back to CPU." << std::endl;

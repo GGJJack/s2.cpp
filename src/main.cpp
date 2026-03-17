@@ -6,18 +6,18 @@
 void print_uso() {
     std::cout << "Usage: s2 [options]\n";
     std::cout << "Options:\n";
-    std::cout << "  -m, --model <path>      Path to unified GGUF model\n";
-    std::cout << "  -t, --tokenizer <path>  Path to tokenizer.json\n";
-    std::cout << "  -text <string>          Text to synthesize\n";
-    std::cout << "  -pa, --prompt-audio <p> Path to reference audio for cloning\n";
-    std::cout << "  -pt, --prompt-text <s>  Text of the reference audio for cloning\n";
-    std::cout << "  -o, --output <path>     Output WAV path\n";
-    std::cout << "  -v, --vulkan <device>   Vulkan device index (-1 for CPU)\n";
-    std::cout << "  -threads N              Number of CPU threads for inference (default: 4)\n";
-    std::cout << "  -max-tokens N           Max tokens to generate (default: 512, ~24s audio)\n";
-    std::cout << "  -temp F                 Sampling temperature (default: 0.7)\n";
-    std::cout << "  -top-p F                Top-p sampling (default: 0.7)\n";
-    std::cout << "  -top-k N                Top-k sampling (default: 30)\n";
+    std::cout << "  -m, --model <path>                  Path to unified GGUF model\n";
+    std::cout << "  -t, --tokenizer <path>              Path to tokenizer.json\n";
+    std::cout << "  -text <string>                      Text to synthesize\n";
+    std::cout << "  -pa, --prompt-audio <p>             Path to reference audio for cloning\n";
+    std::cout << "  -pt, --prompt-text <s>              Text of the reference audio for cloning\n";
+    std::cout << "  -o, --output <path>                 Output WAV path\n";
+    std::cout << "  -v, -c, --vulkan, --cuda <device>   Vulkan/Cuda device index (-1 for CPU)\n";
+    std::cout << "  -threads N                          Number of CPU threads for inference (default: 4)\n";
+    std::cout << "  -max-tokens N                       Max tokens to generate (default: 512, ~24s audio)\n";
+    std::cout << "  -temp F                             Sampling temperature (default: 0.7)\n";
+    std::cout << "  -top-p F                            Top-p sampling (default: 0.7)\n";
+    std::cout << "  -top-k N                            Top-k sampling (default: 30)\n";
 }
 
 int main(int argc, char ** argv) {
@@ -32,7 +32,7 @@ int main(int argc, char ** argv) {
     params.tokenizer_path = "tokenizer.json";
     params.output_path = "out.wav";
     params.text = "Hello world";
-    params.vulkan_device = -1;
+    params.npu_device = -1;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -48,8 +48,8 @@ int main(int argc, char ** argv) {
             if (i + 1 < argc) params.prompt_text = argv[++i];
         } else if (arg == "-o" || arg == "--output") {
             if (i + 1 < argc) params.output_path = argv[++i];
-        } else if (arg == "-v" || arg == "--vulkan") {
-            if (i + 1 < argc) params.vulkan_device = std::stoi(argv[++i]);
+        } else if (arg == "-v" || arg == "--vulkan" || arg == "-c" || arg == "--cuda") {
+            if (i + 1 < argc) params.npu_device = std::stoi(argv[++i]);
         } else if (arg == "-threads") {
             if (i + 1 < argc) params.gen.n_threads = std::stoi(argv[++i]);
         } else if (arg == "-max-tokens") {
