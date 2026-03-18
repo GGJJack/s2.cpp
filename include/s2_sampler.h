@@ -14,8 +14,12 @@ struct SamplerParams {
     int32_t top_k       = 30;
 };
 
-// Sample a single token from logits using top-k + top-p + temperature + Gumbel-max
-int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerParams & params);
+// Sample a single token from logits using top-k + top-p + temperature.
+// always_include_id: if >= 0 and has a finite logit, this token is guaranteed
+// to survive both top-k and top-p truncation (used to ensure EOS is always
+// reachable regardless of GPU numerical precision differences).
+int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerParams & params,
+                     int32_t always_include_id = -1);
 
 // Repetition Aware Sampling (RAS):
 // Tracks a window of recent tokens, resamples with high temp if repeating.

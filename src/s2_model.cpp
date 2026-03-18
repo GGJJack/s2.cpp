@@ -300,7 +300,11 @@ bool SlowARModel::load(const std::string & gguf_path, int32_t vulkan_device) {
         const size_t toff  = data_offset + gguf_get_tensor_offset(ctx_gguf, ti);
         const size_t tsize = ggml_nbytes(t);
         if (tmp.size() < tsize) tmp.resize(tsize);
-        std::fseek(f, static_cast<long>(toff), SEEK_SET);
+#ifdef _WIN32
+        _fseeki64(f, (int64_t)toff, SEEK_SET);
+#else
+        fseeko(f, (off_t)toff, SEEK_SET);
+#endif
         if (std::fread(tmp.data(), 1, tsize, f) != tsize) {
             std::cerr << "[Model] Failed to read tensor: " << tname << std::endl;
             std::fclose(f);

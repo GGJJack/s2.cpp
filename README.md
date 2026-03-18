@@ -42,7 +42,7 @@ All variants include both the transformer weights and the audio codec in a singl
 ### Build dependencies
 
 - CMake ≥ 3.14
-- C++17 compiler (GCC ≥ 10, Clang ≥ 11)
+- C++17 compiler (GCC ≥ 10, Clang ≥ 11, MSVC 2019+)
 - For Vulkan GPU support: Vulkan SDK and `glslc`
 
 ```bash
@@ -187,7 +187,8 @@ The C++ engine (`src/`) is built entirely on [ggml](https://github.com/ggml-org/
 - No streaming output — WAV is written only after full generation completes
 - No batch inference
 - Voice cloning quality depends heavily on reference audio length and SNR
-- Tested only on Linux/AMD Vulkan (RADV); NVIDIA and macOS are untested
+- Windows is tested on CPU only — Vulkan on Windows is untested
+- macOS is untested
 
 ---
 

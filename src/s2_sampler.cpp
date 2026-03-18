@@ -24,7 +24,8 @@ static void apply_softmax(std::vector<float> & probs, float temp = 1.0f) {
 }
 
 // Sample a single token from logits
-int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerParams & params) {
+int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerParams & params,
+                     int32_t always_include_id) {
     if (vocab_size <= 0) return 0;
 
     std::vector<std::pair<float, int32_t>> items;
@@ -33,7 +34,7 @@ int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerPara
         items.push_back({logits[i], i});
     }
 
-    // Sort descending by logit probability
+    // Sort descending by logit
     std::sort(items.begin(), items.end(), [](const auto & a, const auto & b) {
         return a.first > b.first;
     });
@@ -42,27 +43,57 @@ int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerPara
     int32_t k = params.top_k > 0 ? std::min(params.top_k, vocab_size) : vocab_size;
     items.resize(k);
 
+    // Force-include always_include_id after top-k if it was excluded.
+    // This ensures EOS can always be sampled regardless of GPU precision differences.
+    if (always_include_id >= 0 && always_include_id < vocab_size &&
+        logits[always_include_id] > -1e30f)
+    {
+        bool found = false;
+        for (const auto & it : items) {
+            if (it.second == always_include_id) { found = true; break; }
+        }
+        if (!found) {
+            items.push_back({logits[always_include_id], always_include_id});
+        }
+    }
+
+    // Re-sort so temperature/softmax and top-p see items in descending logit order
+    std::sort(items.begin(), items.end(), [](const auto & a, const auto & b) {
+        return a.first > b.first;
+    });
+
+    int32_t n = (int32_t)items.size();
+
     // Apply temperature and softmax to get probabilities
-    std::vector<float> probs(k);
-    for (int32_t i = 0; i < k; ++i) probs[i] = items[i].first;
+    std::vector<float> probs(n);
+    for (int32_t i = 0; i < n; ++i) probs[i] = items[i].first;
     apply_softmax(probs, params.temperature);
 
-    // Sort again by probability for Top-P (though already sorted by logit, which means sorted by prob)
-    // We can directly compute Top-P cumulative max
+    // Top-P — items/probs are already sorted descending.
+    // Track always_include_id position so we can force it in even if top-p cuts it.
+    int32_t always_pos = -1;
+    if (always_include_id >= 0) {
+        for (int32_t i = 0; i < n; ++i) {
+            if (items[i].second == always_include_id) { always_pos = i; break; }
+        }
+    }
+
     float cumsum = 0.0f;
     int32_t p_idx = 0;
-    while (p_idx < k) {
+    while (p_idx < n) {
         cumsum += probs[p_idx];
         p_idx++;
         if (cumsum >= params.top_p) break;
     }
-    
-    // Safety check
     if (p_idx == 0) p_idx = 1;
+
+    // Force always_include_id past top-p cutoff if needed
+    if (always_pos >= p_idx) p_idx = always_pos + 1;
+
     items.resize(p_idx);
     probs.resize(p_idx);
 
-    // Re-normalize probabilities after Top-P truncation
+    // Re-normalize after top-p truncation
     float sum_p = 0.0f;
     for (int32_t i = 0; i < p_idx; ++i) sum_p += probs[i];
     if (sum_p > 0) {
@@ -72,7 +103,7 @@ int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerPara
     // Sample using std::discrete_distribution
     static std::mt19937 gen(std::random_device{}());
     std::discrete_distribution<int32_t> dist(probs.begin(), probs.end());
-    
+
     int32_t sampled_idx = dist(gen);
     return items[sampled_idx].second;
 }

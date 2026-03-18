@@ -787,7 +787,11 @@ bool AudioCodec::load(const std::string & gguf_path, int32_t vulkan_device) {
             const size_t off   = data_offset + gguf_get_tensor_offset(gguf_ctx, ti);
             const size_t nbytes = ggml_nbytes(t);
             std::vector<uint8_t> tmp(nbytes);
-            std::fseek(f, static_cast<long>(off), SEEK_SET);
+#ifdef _WIN32
+            _fseeki64(f, (int64_t)off, SEEK_SET);
+#else
+            fseeko(f, (off_t)off, SEEK_SET);
+#endif
             if (std::fread(tmp.data(), 1, nbytes, f) != nbytes) {
                 std::fclose(f);
                 throw std::runtime_error(std::string("failed to read tensor: ") + name);
