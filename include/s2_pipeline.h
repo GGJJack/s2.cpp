@@ -29,7 +29,7 @@ struct PipelineParams {
     GenerateParams gen;
 
     // Backend
-    int32_t vulkan_device = -1;   // -1 = CPU only
+    int32_t npu_device = -1;   // -1 = CPU only
 };
 
 class Pipeline {

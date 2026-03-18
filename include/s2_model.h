@@ -12,6 +12,8 @@
 #include "gguf.h"
 #ifdef GGML_USE_VULKAN
 #include "ggml-vulkan.h"
+#elif defined GGML_USE_CUDA
+#include "ggml-cuda.h"
 #endif
 
 #include <cstdint>

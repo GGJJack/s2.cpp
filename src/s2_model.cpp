@@ -109,7 +109,7 @@ bool SlowARModel::load(const std::string & gguf_path, int32_t npu_device) {
             std::cerr << "[Model] Cuda init failed, falling back to CPU." << std::endl;
         }
 #else
-        std::cerr << "[Model] Vulkan not compiled, falling back to CPU." << std::endl;
+        std::cerr << "[Model] NPU not compiled, falling back to CPU." << std::endl;
 #endif
     }
     if (!backend_) {

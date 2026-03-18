@@ -1,6 +1,8 @@
 #include "../include/s2_codec.h"
 #ifdef GGML_USE_VULKAN
 #include "ggml-vulkan.h"
+#elif defined GGML_USE_CUDA
+#include "ggml-cuda.h"
 #endif
 #include <iostream>
 #include <vector>
@@ -662,12 +664,17 @@ AudioCodec::~AudioCodec() {
 // load()
 // ---------------------------------------------------------------------------
 
-bool AudioCodec::load(const std::string & gguf_path, int32_t vulkan_device) {
-    if (vulkan_device >= 0) {
+bool AudioCodec::load(const std::string & gguf_path, int32_t npu_device) {
+    if (npu_device >= 0) {
 #ifdef GGML_USE_VULKAN
-        impl_->backend = ggml_backend_vk_init(static_cast<size_t>(vulkan_device));
+        impl_->backend = ggml_backend_vk_init(static_cast<size_t>(npu_device));
         if (!impl_->backend) {
             std::cerr << "[Codec] Vulkan init failed, falling back to CPU." << std::endl;
+        }
+#elif defined GGML_USE_CUDA
+        impl_->backend = ggml_backend_cuda_init(static_cast<size_t>(npu_device));
+        if (!impl_->backend) {
+            std::cerr << "[Codec] Cuda init failed, falling back to CPU." << std::endl;
         }
 #endif
     }

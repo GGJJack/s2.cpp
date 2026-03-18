@@ -48,8 +48,10 @@ int main(int argc, char ** argv) {
             if (i + 1 < argc) params.prompt_text = argv[++i];
         } else if (arg == "-o" || arg == "--output") {
             if (i + 1 < argc) params.output_path = argv[++i];
-        } else if (arg == "-v" || arg == "--vulkan" || arg == "-c" || arg == "--cuda") {
-            if (i + 1 < argc) params.npu_device = std::stoi(argv[++i]);
+        } else if (arg == "-v" || arg == "--vulkan") {
+            if (i + 1 < argc) params.npu_device = std::stoi(argv[++i]); //Vulkan.
+        } else if (arg == "-c" || arg == "--cuda") {
+            if (i + 1 < argc) params.npu_device = std::stoi(argv[++i]); //Cuda.
         } else if (arg == "-threads") {
             if (i + 1 < argc) params.gen.n_threads = std::stoi(argv[++i]);
         } else if (arg == "-max-tokens") {
