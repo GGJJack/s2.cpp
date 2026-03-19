@@ -27,7 +27,17 @@ void print_uso() {
     std::cout << "  -P --port                           Server port\n";
 }
 
+inline void init_utf8_console() {
+    #ifdef _WIN32
+        #include <windows.h>
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+    #endif
+}
+
 int main(int argc, char ** argv) {
+    init_utf8_console();
+
     if (argc < 2) {
         print_uso();
         return 1;
