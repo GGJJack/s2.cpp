@@ -8,24 +8,7 @@
 
 using json = nlohmann::json;
 
-using s2::GenerateParams;
-struct GenerateParamsRequest : GenerateParams
-{
-    int32_t max_new_tokens;
-    float temperature;
-    float top_p;
-    int32_t top_k;
-    int32_t min_tokens_before_end;
-    int32_t n_threads;
-    bool verbose;
-    float repeat_penalty;
-};
-
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GenerateParamsRequest,
-    max_new_tokens, temperature, top_p, top_k,
-    min_tokens_before_end, n_threads, verbose, repeat_penalty)
-
-    bool create_directories_recursive(const std::string& path)
+bool create_directories_recursive(const std::string& path)
 {
     try
     {
@@ -47,7 +30,6 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GenerateParamsRequest,
 
 namespace s2
 {
-
     Server::Server() {}
     Server::~Server() {}
 
@@ -95,21 +77,20 @@ namespace s2
                     return;
                 }
 
-                s2::PipelineParams pipelineParams;
+                PipelineParams pipelineParams;
 
                 if (!req.form.has_field("text"))
                 {
                     json err = { {"error", "No text field in multipart form"} };
                     res.set_content(err.dump(), "application/json");
                     res.status = 400;
+                    return;
                 }
 
-                std::cout << "  " << "text: " << req.form.get_field("text") << std::endl;
                 pipelineParams.text = req.form.get_field("text");
 
                 if (req.form.has_field("reference_text"))
                 {
-                    std::cout << "  " << "reference_text: " << req.form.get_field("reference_text") << std::endl;
                     pipelineParams.prompt_text = req.form.get_field("reference_text");
                 }
 
@@ -117,7 +98,46 @@ namespace s2
                 {
                     try {
                         auto j = json::parse(req.form.get_field("params"));
-                        pipelineParams.gen = j.get<GenerateParamsRequest>();
+
+                        if (j.contains("max_new_tokens")) {
+                            int32_t val = j["max_new_tokens"].get<int32_t>();
+                            pipelineParams.gen.max_new_tokens = val;
+                        }
+
+                        if (j.contains("temperature")) {
+                            float val = j["temperature"].get<float>();
+                            pipelineParams.gen.temperature = val;
+                        }
+
+                        if (j.contains("top_p")) {
+                            float val = j["top_p"].get<float>();
+                            pipelineParams.gen.top_p = val;
+                        }
+
+                        if (j.contains("top_k")) {
+                            int32_t val = j["top_k"].get<int32_t>();
+                            pipelineParams.gen.top_k = val;
+                        }
+
+                        if (j.contains("min_tokens_before_end")) {
+                            int32_t val = j["min_tokens_before_end"].get<int32_t>();
+                            pipelineParams.gen.min_tokens_before_end = val;
+                        }
+
+                        if (j.contains("n_threads")) {
+                            int32_t val = j["n_threads"].get<int32_t>();
+                            pipelineParams.gen.n_threads = val;
+                        }
+
+                        if (j.contains("verbose")) {
+                            bool val = j["verbose"].get<bool>();
+                            pipelineParams.gen.verbose = val;
+                        }
+
+                        if (j.contains("repeat_penalty")) {
+                            float val = j["repeat_penalty"].get<float>();
+                            pipelineParams.gen.repeat_penalty = val;
+                        }
                     }
                     catch (const json::parse_error& e) {
                         json err = { {"error", "JSON parse error"} };
@@ -188,4 +208,5 @@ namespace s2
 
         return 1;
     }
+
 }
