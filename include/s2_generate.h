@@ -23,6 +23,7 @@ struct GenerateParams {
     int32_t min_tokens_before_end   = 64;
     int32_t n_threads               = 4;
     bool    verbose                 = true;
+    float   repeat_penalty          = 1.00f;
 };
 
 // Generate VQ codes autoregressively.

@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "../third_party/dr_wav.h";
+
 namespace s2 {
 
 struct AudioData {
@@ -20,6 +22,9 @@ bool audio_read(const std::string & path, AudioData & out);
 
 // Write mono float32 audio to WAV file.
 bool audio_write_wav(const std::string & path, const float * data, size_t n_samples, int32_t sample_rate);
+// Write mono float32 audio to WAV.
+bool audio_write_memory_wav(void ** pWavData, size_t * pWavSize, const float * data, size_t n_samples, int32_t sample_rate);
+void audio_free_memory_wav(void** pWavData, size_t* pWavSize, const drwav_allocation_callbacks* pAllocationCallbacks);
 
 // Resample mono float32 audio from src_rate to dst_rate (simple linear interpolation).
 // For production, a polyphase resampler is preferred.

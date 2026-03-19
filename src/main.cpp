@@ -1,4 +1,7 @@
+#include "../third_party/filesystem.hpp"
+namespace fs = ghc::filesystem;
 #include "s2_pipeline.h"
+#include "s2_server.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -6,18 +9,22 @@
 void print_uso() {
     std::cout << "Usage: s2 [options]\n";
     std::cout << "Options:\n";
-    std::cout << "  -m, --model <path>                  Path to unified GGUF model\n";
-    std::cout << "  -t, --tokenizer <path>              Path to tokenizer.json\n";
-    std::cout << "  -text <string>                      Text to synthesize\n";
-    std::cout << "  -pa, --prompt-audio <p>             Path to reference audio for cloning\n";
-    std::cout << "  -pt, --prompt-text <s>              Text of the reference audio for cloning\n";
-    std::cout << "  -o, --output <path>                 Output WAV path\n";
+    std::cout << "  -m, --model <path>      Path to unified GGUF model\n";
+    std::cout << "  -t, --tokenizer <path>  Path to tokenizer.json\n";
+    std::cout << "  -text <string>          Text to synthesize\n";
+    std::cout << "  -pa, --prompt-audio <p> Path to reference audio for cloning\n";
+    std::cout << "  -pt, --prompt-text <s>  Text of the reference audio for cloning\n";
+    std::cout << "  -o, --output <path>     Output WAV path\n";
     std::cout << "  -v, -c, --vulkan, --cuda <device>   Vulkan/Cuda device index (-1 for CPU)\n";
-    std::cout << "  -threads N                          Number of CPU threads for inference (default: 4)\n";
-    std::cout << "  -max-tokens N                       Max tokens to generate (default: 512, ~24s audio)\n";
-    std::cout << "  -temp F                             Sampling temperature (default: 0.7)\n";
-    std::cout << "  -top-p F                            Top-p sampling (default: 0.7)\n";
-    std::cout << "  -top-k N                            Top-k sampling (default: 30)\n";
+    std::cout << "  -threads N              Number of CPU threads for inference (default: 4)\n";
+    std::cout << "  -max-tokens N           Max tokens to generate (default: 512, ~24s audio)\n";
+    std::cout << "  -temp F                 Sampling temperature (default: 0.7)\n";
+    std::cout << "  -top-p F                Top-p sampling (default: 0.7)\n";
+    std::cout << "  -top-k N                Top-k sampling (default: 30)\n";
+    std::cout << "  --repeat-penalty N      Penalize repeat sequence of tokens (default: 1.0 = disabled)\n";
+    std::cout << "  --server                Start http server\n";
+    std::cout << "  -H --host               Server host\n";
+    std::cout << "  -P --port               Server port\n";
 }
 
 int main(int argc, char ** argv) {
@@ -26,6 +33,8 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
+    fs::u8arguments u8guard(argc, argv);
+
     s2::PipelineParams params;
     // Default paths
     params.model_path = "model.gguf";
@@ -33,6 +42,9 @@ int main(int argc, char ** argv) {
     params.output_path = "out.wav";
     params.text = "Hello world";
     params.npu_device = -1;
+
+    int32_t use_server;
+    s2::ServerParams serverParams;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -62,6 +74,14 @@ int main(int argc, char ** argv) {
             if (i + 1 < argc) params.gen.top_p = std::stof(argv[++i]);
         } else if (arg == "-top-k") {
             if (i + 1 < argc) params.gen.top_k = std::stoi(argv[++i]);
+        } else if (arg == "--repeat-penalty") {
+            if (i + 1 < argc) params.gen.top_k = std::stoi(argv[++i]);
+        } else if (arg == "--server") {
+            if (i + 1 < argc) use_server = std::stoi(argv[++i]);
+        } else if (arg == "-H" || arg == "--host") {
+            if (i + 1 < argc) serverParams.host = argv[++i];
+        } else if (arg == "-P" || arg == "--port") {
+            if (i + 1 < argc) serverParams.port = std::stoi(argv[++i]);
         } else if (arg == "-h" || arg == "--help") {
             print_uso();
             return 0;
@@ -94,6 +114,20 @@ int main(int argc, char ** argv) {
                 }
             }
         }
+    }
+
+    if (use_server == 1)
+    {
+        serverParams.pipeline = params;
+
+        s2::Server server;
+        if (!server.serve(serverParams))
+        {
+            std::cerr << "Server initialization failed." << std::endl;
+            return 1;
+        }
+        
+        return 0;
     }
 
     s2::Pipeline pipeline;
