@@ -46,10 +46,10 @@ public:
     bool synthesize(const PipelineParams & params);
 
     // Run synthesis: text (+ optional reference audio) → wav_buffer
-    bool synthesize_to_memory(const PipelineParams & params, void** wav_buffer, size_t* wav_size);
+    bool synthesize_to_memory(const PipelineParams & params, void** ref_audio_buffer, size_t* ref_audio_size, void** wav_buffer, size_t* wav_size);
 
     // Run synthesis: text (+ optional reference audio) → Vector
-    bool synthesize_raw(const PipelineParams & params, std::vector<float> & audio_out);
+    bool synthesize_raw(const PipelineParams & params, AudioData & ref_audio, std::vector<float> & audio_out);
 
 private:
     Tokenizer   tokenizer_;

@@ -44,7 +44,18 @@ bool Pipeline::init(const PipelineParams & params) {
 
 bool Pipeline::synthesize(const PipelineParams & params) {
     std::vector<float> audio_out;
-    if (!this->synthesize_raw(params, audio_out)) {
+    AudioData ref_audio;
+
+    if (!params.prompt_audio_path.empty()) {
+        std::cout << "Loading reference audio: " << params.prompt_audio_path << std::endl;
+    
+        if (!load_audio(params.prompt_audio_path, ref_audio, codec_.sample_rate())) {
+            std::cerr << "Pipeline warning: load_audio failed, running without reference audio." << std::endl;
+            return false;
+        }
+    }
+
+    if (!this->synthesize_raw(params, ref_audio, audio_out)) {
         std::cerr << "Pipeline error: decode failed." << std::endl;
         return false;
     }
@@ -58,9 +69,20 @@ bool Pipeline::synthesize(const PipelineParams & params) {
     return true;
 }
 
-bool Pipeline::synthesize_to_memory(const PipelineParams & params, void** wav_buffer, size_t* wav_size) {
+bool Pipeline::synthesize_to_memory(const PipelineParams & params, void** ref_audio_buffer, size_t* ref_audio_size, void** wav_buffer, size_t* wav_size) {
     std::vector<float> audio_out;
-    if (!this->synthesize_raw(params, audio_out)) {
+    AudioData ref_audio;
+
+    if (ref_audio_buffer && ref_audio_size && *ref_audio_buffer && *ref_audio_size > 0) {
+        std::cout << "Loading reference audio..." << std::endl;
+    
+        if (!load_audio_from_memory(*ref_audio_buffer, *ref_audio_size, ref_audio, codec_.sample_rate())) {
+            std::cerr << "Pipeline warning: load_audio failed, running without reference audio." << std::endl;
+            return false;
+        }
+    }
+
+    if (!this->synthesize_raw(params, ref_audio, audio_out)) {
         std::cerr << "Pipeline error: decode failed." << std::endl;
         return false;
     }
@@ -80,7 +102,7 @@ bool Pipeline::synthesize_to_memory(const PipelineParams & params, void** wav_bu
     return true;
 }
 
-bool Pipeline::synthesize_raw(const PipelineParams & params, std::vector<float>& audio_out) {
+bool Pipeline::synthesize_raw(const PipelineParams & params, AudioData & ref_audio, std::vector<float>& audio_out) {
     std::lock_guard<std::mutex> lock(synthesize_mutex_);
 
     if (!initialized_) {
@@ -108,21 +130,16 @@ bool Pipeline::synthesize_raw(const PipelineParams & params, std::vector<float>&
     // matching the layout expected by build_prompt() (prompt_codes[c*T+t]).
     std::vector<int32_t> ref_codes;
     int32_t T_prompt = 0;
-    if (!params.prompt_audio_path.empty()) {
-        std::cout << "Loading reference audio: " << params.prompt_audio_path << std::endl;
-        AudioData ref_audio;
-        if (load_audio(params.prompt_audio_path, ref_audio, codec_.sample_rate())) {
-            if (!codec_.encode(ref_audio.samples.data(), (int32_t)ref_audio.samples.size(),
-                               params.gen.n_threads, ref_codes, T_prompt)) {
-                std::cerr << "Pipeline warning: encode failed, running without reference audio." << std::endl;
-                ref_codes.clear();
-                T_prompt = 0;
-            }
-        } else {
-            std::cerr << "Pipeline warning: load_audio failed, running without reference audio." << std::endl;
+
+    if (!ref_audio.samples.empty()) {
+        if (!codec_.encode(ref_audio.samples.data(), (int32_t)ref_audio.samples.size(),
+                            params.gen.n_threads, ref_codes, T_prompt)) {
+            std::cerr << "Pipeline warning: encode failed, running without reference audio." << std::endl;
+            ref_codes.clear();
+            T_prompt = 0;
         }
     }
-
+          
     // 2. Build Prompt Tensor
     // build_prompt expects prompt_codes as (num_codebooks, T_prompt) row-major,
     // which is exactly the format produced by encode() above.

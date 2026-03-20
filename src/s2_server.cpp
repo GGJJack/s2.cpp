@@ -69,14 +69,6 @@ namespace s2
 
         svr.Post("/generate", [&](const httplib::Request& req, httplib::Response& res)
             {
-
-                if (!req.form.has_file("reference")) {
-                    json err = { {"error", "No file field in multipart form"} };
-                    res.set_content(err.dump(), "application/json");
-                    res.status = 400;
-                    return;
-                }
-
                 PipelineParams pipelineParams;
                 pipelineParams.gen = params.pipeline.gen;
 
@@ -148,43 +140,29 @@ namespace s2
                     }
                 }
 
-                const auto& file = req.form.get_file("reference");
 
-                auto safe_filename = file.filename.empty() ? "unnamed_file" : httplib::sanitize_filename(file.filename);
-                std::string temp_dir_path = "./TEMP_AUDIO/";
-                std::string reference_audio_path = temp_dir_path + safe_filename;
-
-                pipelineParams.prompt_audio_path = reference_audio_path;
-
-                if (!create_directories_recursive(temp_dir_path)) {
-                    res.status = 500;
-                    res.set_content(R"({"error": "Cannot create temp directory"})", "application/json");
-                    return;
-                }
-
-                std::ofstream ofs(reference_audio_path, std::ios::binary);
-                if (!ofs)
-                {
-                    res.status = 500;
-                    res.set_content(R"({"error": "Cannot write file"})", "application/json");
-                    return;
-                }
-
-                ofs.write(file.content.data(), file.content.size());
-                ofs.close();
+                const void* ref_audio_buffer = nullptr;
+                size_t ref_audio_size = 0;
 
                 void* wav_buffer = nullptr;
                 size_t wav_size = 0;
-                if (!pipeline.synthesize_to_memory(pipelineParams, &wav_buffer, &wav_size))
+
+                if (req.form.has_file("reference")) {
+                    const auto& file = req.form.get_file("reference");
+
+                    if (!file.content.empty()) {
+                        ref_audio_buffer = file.content.data();
+                        ref_audio_size = file.content.size();
+                    }
+                }
+
+                if (!pipeline.synthesize_to_memory(pipelineParams, const_cast<void**>(&ref_audio_buffer), &ref_audio_size, &wav_buffer, &wav_size))
                 {
                     std::cerr << "Synthesis failed." << std::endl;
                     res.status = 500;
                     res.set_content("Failed to create WAV", "text/plain");
                     return;
                 }
-
-                std::filesystem::remove(reference_audio_path);
-
 
                 if (!wav_buffer || wav_size == 0)
                 {
