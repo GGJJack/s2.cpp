@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "../third_party/dr_wav.h";
+#include "../third_party/dr_wav.h"
 
 namespace s2 {
 
