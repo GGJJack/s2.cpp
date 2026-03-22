@@ -159,6 +159,24 @@ By default, the engine keeps a small `8`-token floor before `EOS`, trims trailin
 
 `-c 0` selects the first CUDA device. The transformer runs on GPU; the audio codec always runs on CPU (executes only twice per synthesis).
 
+### Server
+
+```bash
+./build/s2 \
+  -m s2-pro-q6_k.gguf \
+  -t tokenizer.json \
+  --vulkan 0 \
+  --server 1 \
+  -H "127.0.0.1" \
+  -P 3000
+
+curl --location 'http://127.0.0.1:3000/generate' \
+  --form 'reference=928496226.wav' \
+  --form 'reference_text="Well... I was joking, but your conspicuous silence has been noted."' \
+  --form 'text="Hello World?"' \
+  --form 'params="{\"max_new_tokens\":2048,\"temperature\":0.58,\"top_p\":0.88,\"top_k\":40}"'
+```
+
 ### All options
 
 | Flag | Default | Description |
