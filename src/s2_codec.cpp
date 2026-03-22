@@ -1,6 +1,8 @@
 #include "../include/s2_codec.h"
 #ifdef GGML_USE_VULKAN
 #include "ggml-vulkan.h"
+#elif defined GGML_USE_CUDA
+#include "ggml-cuda.h"
 #endif
 #ifdef GGML_USE_CUDA
 #include "ggml-cuda.h"

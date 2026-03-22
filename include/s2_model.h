@@ -103,6 +103,8 @@ public:
     // Reset KV cache (for new generation)
     void reset();
 
+    void clear_kv_cache();
+
     // Prefill: process prompt tokens. flat_tokens: (num_codebooks+1)*n_tokens
     bool prefill(const std::vector<int32_t> & flat_tokens, int32_t n_tokens,
                  int32_t n_threads, StepResult & result);

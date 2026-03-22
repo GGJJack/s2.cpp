@@ -161,6 +161,24 @@ Provide a short reference clip (5–30 seconds, WAV or MP3) and a transcript of 
 
 `--cuda 0` selects the first CUDA device. As with Vulkan, the transformer runs on GPU and the audio codec on CPU.
 
+### Server
+
+```bash
+./build/s2 \
+  -m s2-pro-q6_k.gguf \
+  -t tokenizer.json \
+  --vulkan 0 \
+  --server 1 \
+  -H "127.0.0.1" \
+  -P 3000
+
+curl --location 'http://127.0.0.1:3000/generate' \
+  --form 'reference=928496226.wav' \
+  --form 'reference_text="Well... I was joking, but your conspicuous silence has been noted."' \
+  --form 'text="Hello World?"' \
+  --form 'params="{\"max_new_tokens\":2048,\"temperature\":0.58,\"top_p\":0.88,\"top_k\":40}"'
+```
+
 ### All options
 
 | Flag | Default | Description |
@@ -178,6 +196,9 @@ Provide a short reference clip (5–30 seconds, WAV or MP3) and a transcript of 
 | `-temp F` | `0.7` | Sampling temperature |
 | `-top-p F` | `0.7` | Top-p nucleus sampling |
 | `-top-k N` | `30` | Top-k sampling |
+| `--server 1` | — | Start http server |
+| `-H`, `--host` | `127.0.0.1` | Server host |
+| `-P`, `--port` | `3030` | Server port |
 
 ---
 

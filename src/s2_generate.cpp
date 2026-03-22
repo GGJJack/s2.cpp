@@ -65,9 +65,9 @@ GenerateResult generate(
             biased[im_end_id] = -std::numeric_limits<float>::infinity();
         }
         SamplerParams sparams;
-        sparams.temperature = params.temperature;
-        sparams.top_p       = params.top_p;
-        sparams.top_k       = params.top_k;
+        sparams.temperature     = params.temperature;
+        sparams.top_p           = params.top_p;
+        sparams.top_k           = params.top_k;
         // Pass im_end_id so it is always eligible for sampling when not blocked,
         // regardless of GPU numerical precision (fixes NVIDIA/NV_coopmat2 EOS dropout).
         const int32_t force_id = block_im_end ? -1 : im_end_id;
@@ -85,9 +85,9 @@ GenerateResult generate(
     std::vector<float> fast_logits;
 
     SamplerParams sparams;
-    sparams.temperature = params.temperature;
-    sparams.top_p       = params.top_p;
-    sparams.top_k       = params.top_k;
+    sparams.temperature     = params.temperature;
+    sparams.top_p           = params.top_p;
+    sparams.top_k           = params.top_k;
 
     // RAS state
     std::vector<int32_t> ras_window;

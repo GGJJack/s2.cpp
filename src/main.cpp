@@ -1,4 +1,7 @@
+#include "../third_party/filesystem.hpp"
+namespace fs = ghc::filesystem;
 #include "s2_pipeline.h"
+#include "s2_server.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -18,13 +21,46 @@ void print_uso() {
     std::cout << "  -temp F                             Sampling temperature (default: 0.7)\n";
     std::cout << "  -top-p F                            Top-p sampling (default: 0.7)\n";
     std::cout << "  -top-k N                            Top-k sampling (default: 30)\n";
+    std::cout << "  --server N                          Start http server\n";
+    std::cout << "  -H --host                           Server host\n";
+    std::cout << "  -P --port                           Server port\n";
+}
+
+inline void init_utf8_console() {
+    #ifdef _WIN32
+        #include <windows.h>
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+    #endif
+}
+
+int safe_parse_int(const std::string& str, const std::string& name, int default_value = 0) {
+    try {
+        return std::stoi(str);
+    } catch (...) {
+        std::cerr << "Invalid integer for " << name << ": " << str << "\n";
+        return default_value;
+    }
+}
+
+float safe_parse_float(const std::string& str, const std::string& name, float default_value = 0.0f) {
+    try {
+        return std::stof(str);
+    } catch (...) {
+        std::cerr << "Invalid float for " << name << ": " << str << "\n";
+        return default_value;
+    }
 }
 
 int main(int argc, char ** argv) {
+    init_utf8_console();
+
     if (argc < 2) {
         print_uso();
         return 1;
     }
+
+    fs::u8arguments u8guard(argc, argv);
 
     s2::PipelineParams params;
     // Default paths
@@ -34,6 +70,9 @@ int main(int argc, char ** argv) {
     params.text = "Hello world";
     params.gpu_device = -1;
     params.backend_type = -1;
+
+    int32_t use_server = 0;
+    s2::ServerParams serverParams;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -50,19 +89,25 @@ int main(int argc, char ** argv) {
         } else if (arg == "-o" || arg == "--output") {
             if (i + 1 < argc) params.output_path = argv[++i];
         } else if (arg == "-v" || arg == "--vulkan") {
-            if (i + 1 < argc) params.gpu_device = std::stoi(argv[++i]); params.backend_type = 0; //Vulkan.
+            if (i + 1 < argc) params.gpu_device = safe_parse_int(argv[++i], arg, params.gpu_device); params.backend_type = 0; //Vulkan.
         } else if (arg == "-c" || arg == "--cuda") {
-            if (i + 1 < argc) params.gpu_device = std::stoi(argv[++i]); params.backend_type = 1; //Cuda.
+            if (i + 1 < argc) params.gpu_device = safe_parse_int(argv[++i], arg, params.gpu_device); params.backend_type = 1; //Cuda.
         } else if (arg == "-threads") {
-            if (i + 1 < argc) params.gen.n_threads = std::stoi(argv[++i]);
+            if (i + 1 < argc) params.gen.n_threads = safe_parse_int(argv[++i], arg, params.gen.n_threads);
         } else if (arg == "-max-tokens") {
-            if (i + 1 < argc) params.gen.max_new_tokens = std::stoi(argv[++i]);
+            if (i + 1 < argc) params.gen.max_new_tokens = safe_parse_int(argv[++i], arg, params.gen.max_new_tokens);
         } else if (arg == "-temp") {
-            if (i + 1 < argc) params.gen.temperature = std::stof(argv[++i]);
+            if (i + 1 < argc) params.gen.temperature = safe_parse_float(argv[++i], arg, params.gen.temperature);
         } else if (arg == "-top-p") {
-            if (i + 1 < argc) params.gen.top_p = std::stof(argv[++i]);
+            if (i + 1 < argc) params.gen.top_p = safe_parse_float(argv[++i], arg, params.gen.top_p);
         } else if (arg == "-top-k") {
-            if (i + 1 < argc) params.gen.top_k = std::stoi(argv[++i]);
+            if (i + 1 < argc) params.gen.top_k = safe_parse_int(argv[++i], arg, params.gen.top_k);
+        } else if (arg == "--server") {
+            if (i + 1 < argc) use_server = safe_parse_int(argv[++i], arg, use_server);
+        } else if (arg == "-H" || arg == "--host") {
+            if (i + 1 < argc) serverParams.host = argv[++i];
+        } else if (arg == "-P" || arg == "--port") {
+            if (i + 1 < argc) serverParams.port = safe_parse_int(argv[++i], arg, serverParams.port);
         } else if (arg == "-h" || arg == "--help") {
             print_uso();
             return 0;
@@ -95,6 +140,20 @@ int main(int argc, char ** argv) {
                 }
             }
         }
+    }
+
+    if (use_server == 1)
+    {
+        serverParams.pipeline = params;
+
+        s2::Server server;
+        if (!server.serve(serverParams))
+        {
+            std::cerr << "Server initialization failed." << std::endl;
+            return 1;
+        }
+        
+        return 0;
     }
 
     s2::Pipeline pipeline;

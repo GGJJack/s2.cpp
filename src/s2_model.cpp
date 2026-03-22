@@ -408,6 +408,24 @@ void SlowARModel::reset() {
     n_past_ = 0;
 }
 
+void SlowARModel::clear_kv_cache() {
+    if (kv_buf_) {
+        ggml_backend_buffer_free(kv_buf_);
+        kv_buf_ = nullptr;
+    }
+
+    if (ctx_kv_) {
+        ggml_free(ctx_kv_);
+        ctx_kv_ = nullptr;
+    }
+
+    memory_k_ = nullptr;
+    memory_v_ = nullptr;
+
+    max_seq_len_ = 0;
+    n_past_ = 0;
+}
+
 // ---------------------------------------------------------------------------
 // prefill() / step()
 // ---------------------------------------------------------------------------

@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.14)
 project(s2cpp LANGUAGES C CXX)
 
+if (WIN32)
+    add_definitions(-DWIN32_LEAN_AND_MEAN)
+endif()
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -42,6 +46,7 @@ set(S2_SOURCES
     src/s2_prompt.cpp
     src/s2_generate.cpp
     src/s2_pipeline.cpp
+    src/s2_server.cpp
     src/main.cpp
 )
 
