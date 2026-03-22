@@ -21,6 +21,7 @@ PromptTensor build_prompt(
     const std::vector<int32_t> NEWLINE = { 198 };
 
     bool has_reference = (prompt_codes != nullptr && T_prompt > 0 && !prompt_text.empty());
+    bool prompt_has_speaker_tag = prompt_text.find("<|speaker:") != std::string::npos;
 
     std::vector<int32_t> sys_pre;
     std::vector<int32_t> sys_post;
@@ -33,7 +34,9 @@ PromptTensor build_prompt(
         app(sys_pre, tokenizer.encode("<|im_start|>system"));
         app(sys_pre, NEWLINE);
         app(sys_pre, tokenizer.encode("convert the provided text to speech reference to the following:\n\nText:\n"));
-        app(sys_pre, tokenizer.encode("<|speaker:0|>"));
+        if (!prompt_has_speaker_tag) {
+            app(sys_pre, tokenizer.encode("<|speaker:0|>"));
+        }
         app(sys_pre, tokenizer.encode(prompt_text));
         app(sys_pre, tokenizer.encode("\n\nSpeech:\n"));
 

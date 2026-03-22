@@ -22,8 +22,24 @@ static void apply_softmax(std::vector<float> & probs, float temp = 1.0f) {
     }
 }
 
-int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerParams & params,
-                     int32_t always_include_id) {
+static std::vector<float> softmax_from_sorted_logits(const std::vector<std::pair<float, int32_t>> & items) {
+    std::vector<float> probs(items.size(), 0.0f);
+    if (items.empty()) return probs;
+
+    const float max_val = items.front().first;
+    float sum = 0.0f;
+    for (size_t i = 0; i < items.size(); ++i) {
+        probs[i] = std::exp(items[i].first - max_val);
+        sum += probs[i];
+    }
+
+    if (sum > 0.0f) {
+        for (float & p : probs) p /= sum;
+    }
+    return probs;
+}
+
+int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerParams & params) {
     if (vocab_size <= 0) return 0;
 
     std::vector<std::pair<float, int32_t>> items;
@@ -36,69 +52,51 @@ int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerPara
         return a.first > b.first;
     });
 
-    int32_t k = params.top_k > 0 ? std::min(params.top_k, vocab_size) : vocab_size;
-    items.resize(k);
+    const int32_t k = params.top_k > 0 ? std::min(params.top_k, vocab_size) : vocab_size;
+    const float top_p = std::clamp(params.top_p, 0.0f, 1.0f);
+    const std::vector<float> sorted_probs = softmax_from_sorted_logits(items);
 
-    if (always_include_id >= 0 && always_include_id < vocab_size &&
-        logits[always_include_id] > -1e30f)
-    {
-        bool found = false;
-        for (const auto & it : items) {
-            if (it.second == always_include_id) { found = true; break; }
-        }
-        if (!found) {
-            items.push_back({logits[always_include_id], always_include_id});
-        }
-    }
-
-    std::sort(items.begin(), items.end(), [](const auto & a, const auto & b) {
-        return a.first > b.first;
-    });
-
-    int32_t n = (int32_t)items.size();
-
-    if (params.temperature <= 0.0f) {
-        return items[0].second;
-    }
-
-    std::vector<float> probs(n);
-    for (int32_t i = 0; i < n; ++i) probs[i] = items[i].first;
-    apply_softmax(probs, params.temperature);
-
-    int32_t always_pos = -1;
-    if (always_include_id >= 0) {
-        for (int32_t i = 0; i < n; ++i) {
-            if (items[i].second == always_include_id) { always_pos = i; break; }
-        }
-    }
+    std::vector<std::pair<float, int32_t>> filtered;
+    filtered.reserve(k);
 
     float cumsum = 0.0f;
-    int32_t p_idx = 0;
-    while (p_idx < n) {
-        cumsum += probs[p_idx];
-        p_idx++;
-        if (cumsum >= params.top_p) break;
+    for (int32_t i = 0; i < (int32_t)items.size(); ++i) {
+        cumsum += sorted_probs[i];
+        const bool remove_for_top_k = (i >= k);
+        const bool remove_for_top_p = (i > 0 && cumsum > top_p);
+        if (remove_for_top_k || remove_for_top_p) {
+            continue;
+        }
+        filtered.push_back(items[i]);
     }
-    if (p_idx == 0) p_idx = 1;
 
-    if (always_pos >= p_idx) p_idx = always_pos + 1;
+    if (filtered.empty()) {
+        filtered.push_back(items.front());
+    }
 
-    items.resize(p_idx);
-    probs.resize(p_idx);
+    if (params.temperature <= 0.0f) {
+        return filtered[0].second;
+    }
+
+    std::vector<float> probs(filtered.size());
+    for (size_t i = 0; i < filtered.size(); ++i) {
+        probs[i] = filtered[i].first;
+    }
+    apply_softmax(probs, params.temperature);
 
     float sum_p = 0.0f;
-    for (int32_t i = 0; i < p_idx; ++i) sum_p += probs[i];
-    if (sum_p > 0) {
-        for (int32_t i = 0; i < p_idx; ++i) probs[i] /= sum_p;
+    for (float p : probs) sum_p += p;
+    if (sum_p <= 0.0f) {
+        return filtered[0].second;
     }
+    for (float & p : probs) p /= sum_p;
 
     thread_local static std::mt19937 gen(std::random_device{}());
     std::discrete_distribution<int32_t> dist(probs.begin(), probs.end());
 
-    int32_t sampled_idx = dist(gen);
-    return items[sampled_idx].second;
+    const int32_t sampled_idx = dist(gen);
+    return filtered[sampled_idx].second;
 }
-
 
 RASSampler::RASSampler(int32_t window_size, float high_temp, float high_top_p)
     : window_size_(window_size), high_temp_(high_temp), high_top_p_(high_top_p) 

@@ -53,6 +53,11 @@ bool Pipeline::synthesize(const PipelineParams & params) {
     std::vector<float> audio_out;
     AudioData ref_audio;
 
+    if (!params.prompt_audio_path.empty() && params.prompt_text.empty()) {
+        safe_print_error_ln("Pipeline error: prompt audio was provided without prompt text.");
+        return false;
+    }
+
     if (!params.prompt_audio_path.empty()) {
         safe_print_ln("Loading reference audio: " + params.prompt_audio_path);
         if (!load_audio(params.prompt_audio_path, ref_audio, codec_.sample_rate())) {
@@ -65,12 +70,17 @@ bool Pipeline::synthesize(const PipelineParams & params) {
         return false;
     }
 
+    if (params.trim_silence && !audio_out.empty()) {
+        auto trimmed = audio_trim_trailing_silence(audio_out.data(), audio_out.size(), codec_.sample_rate());
+        if (!trimmed.empty()) audio_out = std::move(trimmed);
+    }
+
     if (params.normalize_dynamic && !audio_out.empty()) {
         audio_out = audio_normalize_dynamic(audio_out.data(), audio_out.size(), codec_.sample_rate());
     }
 
     if (!save_audio(params.output_path, audio_out, codec_.sample_rate(),
-                    params.trim_silence, params.normalize_output)) {
+                    false, params.normalize_output)) {
         safe_print_error_ln("Pipeline error: save_audio failed to " + params.output_path);
         return false;
     }
@@ -82,6 +92,11 @@ bool Pipeline::synthesize(const PipelineParams & params) {
 bool Pipeline::synthesize_to_memory(const PipelineParams & params, void** ref_audio_buffer, size_t* ref_audio_size, void** wav_buffer, size_t* wav_size) {
     std::vector<float> audio_out;
     AudioData ref_audio;
+
+    if (ref_audio_buffer && ref_audio_size && *ref_audio_buffer && *ref_audio_size > 0 && params.prompt_text.empty()) {
+        safe_print_error_ln("Pipeline error: reference audio was provided without reference text.");
+        return false;
+    }
 
     if (ref_audio_buffer && ref_audio_size && *ref_audio_buffer && *ref_audio_size > 0) {
         safe_print_ln("Loading reference audio...");
@@ -95,17 +110,17 @@ bool Pipeline::synthesize_to_memory(const PipelineParams & params, void** ref_au
         return false;
     }
 
+    if (params.trim_silence && !audio_out.empty()) {
+        auto trimmed = audio_trim_trailing_silence(audio_out.data(), audio_out.size(), codec_.sample_rate());
+        if (!trimmed.empty()) audio_out = std::move(trimmed);
+    }
+
     if (params.normalize_dynamic && !audio_out.empty()) {
         audio_out = audio_normalize_dynamic(audio_out.data(), audio_out.size(), codec_.sample_rate());
     } else if (params.normalize_output && !audio_out.empty()) {
         float peak = 0.0f;
         for (float s : audio_out) { float a = std::fabs(s); if (a > peak) peak = a; }
         if (peak > 1e-6f) { float scale = 0.95f / peak; for (float & s : audio_out) s *= scale; }
-    }
-
-    if (params.trim_silence) {
-        auto trimmed = audio_trim_trailing_silence(audio_out.data(), audio_out.size(), codec_.sample_rate());
-        if (!trimmed.empty()) audio_out = std::move(trimmed);
     }
 
     if (!audio_write_memory_wav(wav_buffer, wav_size, audio_out.data(), audio_out.size(), codec_.sample_rate())) {

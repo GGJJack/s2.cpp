@@ -40,6 +40,8 @@ void print_uso() {
     safe_print("  -temp              <f>      Temperature\n");
     safe_print("  -top-p             <f>      Top-p sampling\n");
     safe_print("  -top-k             <n>      Top-k sampling\n");
+    safe_print("  --dynamic-normalize         Apply dynamic RMS normalization\n");
+    safe_print("  --no-dynamic-normalize      Disable dynamic RMS normalization\n");
     safe_print("  --no-trim-silence           Keep trailing silence in output WAV\n");
     safe_print("  --trim-silence              Trim trailing silence in output WAV\n");
     safe_print("  --no-normalize              Keep original output peak level\n");
@@ -124,6 +126,8 @@ int main(int argc, char** argv) {
         else if (arg == "-temp")              { if (i+1 < argc) { try { params.gen.temperature = std::stof(argv[++i]); } catch(...) {} } }
         else if (arg == "-top-p")             { if (i+1 < argc) { try { params.gen.top_p       = std::stof(argv[++i]); } catch(...) {} } }
         else if (arg == "-top-k")             { if (i+1 < argc) { try { params.gen.top_k       = std::stoi(argv[++i]); } catch(...) {} } }
+        else if (arg == "--dynamic-normalize")     { params.normalize_dynamic = true;  }
+        else if (arg == "--no-dynamic-normalize")  { params.normalize_dynamic = false; }
         else if (arg == "--no-trim-silence")  { params.trim_silence     = false; }
         else if (arg == "--trim-silence")     { params.trim_silence     = true;  }
         else if (arg == "--no-normalize")     { params.normalize_output = false; }
@@ -156,8 +160,8 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (params.gen.max_new_tokens > 800) {
-        safe_print_error("Warning: -max-tokens > 800 may cause voice quality degradation. Consider splitting long texts.\n");
+    if (params.gen.max_new_tokens > 1024) {
+        safe_print_error("Warning: -max-tokens > 1024 may cause voice quality degradation. Consider splitting long texts.\n");
     }
 
     if (use_server) {

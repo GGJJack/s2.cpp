@@ -221,22 +221,21 @@ std::vector<float> audio_trim_trailing_silence(const float * data, size_t n_samp
     if (n_samples == 0) return std::vector<float>();
     if (sample_rate <= 0) sample_rate = 44100;
 
-    size_t last_audio_idx = 0;
     const size_t min_silence_samples = static_cast<size_t>(min_silence_duration * sample_rate);
+    const size_t keep_tail_samples = static_cast<size_t>(0.01f * sample_rate);
+    size_t last_audio_idx = n_samples;
 
     for (size_t i = n_samples - 1; i > 0; --i) {
         if (std::fabs(data[i]) > threshold) {
             size_t silence_after = n_samples - 1 - i;
             if (silence_after >= min_silence_samples) {
-                last_audio_idx = i + min_silence_samples;
-            } else {
-                last_audio_idx = n_samples;
+                last_audio_idx = std::min(n_samples, i + 1 + keep_tail_samples);
             }
             break;
         }
     }
 
-    if (last_audio_idx == 0) {
+    if (last_audio_idx == n_samples) {
         bool has_audio = false;
         for (size_t i = 0; i < n_samples; ++i) {
             if (std::fabs(data[i]) > threshold) {
@@ -245,7 +244,7 @@ std::vector<float> audio_trim_trailing_silence(const float * data, size_t n_samp
             }
         }
         if (!has_audio) return std::vector<float>();
-        last_audio_idx = n_samples;
+        return std::vector<float>(data, data + n_samples);
     }
 
     const size_t min_audio_samples = static_cast<size_t>(0.1f * sample_rate);

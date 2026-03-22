@@ -9,17 +9,15 @@
 namespace s2 {
 
 struct SamplerParams {
-    float   temperature     = 0.7f;
-    float   top_p           = 0.7f;
+    float   temperature     = 0.8f;
+    float   top_p           = 0.8f;
     int32_t top_k           = 30;
 };
 
 // Sample a single token from logits using top-k + top-p + temperature.
-// always_include_id: if >= 0 and has a finite logit, this token is guaranteed
-// to survive both top-k and top-p truncation (used to ensure EOS is always
-// reachable regardless of GPU numerical precision differences).
-int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerParams & params,
-                     int32_t always_include_id = -1);
+// Matches fish-speech sampling order: top-k/top-p are computed on raw logits,
+// then temperature is applied only after truncation.
+int32_t sample_token(const float * logits, int32_t vocab_size, const SamplerParams & params);
 
 // Repetition Aware Sampling (RAS):
 // Tracks a window of recent tokens, resamples with high temp if repeating.

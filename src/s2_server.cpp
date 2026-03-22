@@ -10,6 +10,28 @@ using json = nlohmann::json;
 
 namespace s2
 {
+    static std::string get_first_form_field(const httplib::MultipartFormData& form,
+                                            const std::initializer_list<const char*>& keys) {
+        for (const char* key : keys) {
+            if (form.has_field(key)) {
+                return form.get_field(key);
+            }
+        }
+        return {};
+    }
+
+    static bool get_first_form_file(const httplib::MultipartFormData& form,
+                                    const std::initializer_list<const char*>& keys,
+                                    httplib::FormData& out) {
+        for (const char* key : keys) {
+            if (form.has_file(key)) {
+                out = form.get_file(key);
+                return true;
+            }
+        }
+        return false;
+    }
+
     Server::Server() {}
     Server::~Server() {}
 
@@ -62,10 +84,8 @@ namespace s2
 
                 pipelineParams.text = req.form.get_field("text");
 
-                if (req.form.has_field("reference_text"))
-                {
-                    pipelineParams.prompt_text = req.form.get_field("reference_text");
-                }
+                pipelineParams.prompt_text = get_first_form_field(
+                    req.form, {"reference_text", "ref_text", "prompt_text"});
 
                 if (req.form.has_field("params"))
                 {
@@ -122,13 +142,18 @@ namespace s2
                 void* wav_buffer = nullptr;
                 size_t wav_size = 0;
 
-                if (req.form.has_file("reference")) {
-                    const auto& file = req.form.get_file("reference");
-
-                    if (!file.content.empty()) {
-                        ref_audio_buffer = file.content.data();
-                        ref_audio_size = file.content.size();
+                httplib::FormData ref_file;
+                if (get_first_form_file(req.form, {"reference", "reference_audio", "prompt_audio", "ref_audio"}, ref_file)) {
+                    if (!ref_file.content.empty()) {
+                        ref_audio_buffer = ref_file.content.data();
+                        ref_audio_size = ref_file.content.size();
                     }
+                }
+
+                if (ref_audio_buffer && ref_audio_size > 0 && pipelineParams.prompt_text.empty()) {
+                    res.status = 400;
+                    res.set_content("Reference audio requires reference_text (aliases: ref_text, prompt_text).", "text/plain");
+                    return;
                 }
 
                 if (!pipeline.synthesize_to_memory(pipelineParams, const_cast<void**>(&ref_audio_buffer), &ref_audio_size, &wav_buffer, &wav_size))

@@ -12,11 +12,11 @@
 namespace s2 {
 
 struct GenerateParams {
-    int32_t max_new_tokens          = 512;
-    float   temperature             = 0.7f;
-    float   top_p                   = 0.7f;
+    int32_t max_new_tokens          = 1024;
+    float   temperature             = 0.8f;
+    float   top_p                   = 0.8f;
     int32_t top_k                   = 30;
-    int32_t min_tokens_before_end   = 8;
+    int32_t min_tokens_before_end   = 0;
     int32_t n_threads               = 4;
     bool    verbose                 = true;
 };

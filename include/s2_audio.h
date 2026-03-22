@@ -26,7 +26,7 @@ std::vector<float> audio_normalize_dynamic(const float * data, size_t n_samples,
 std::vector<float> audio_trim_trailing_silence(const float * data, size_t n_samples,
                                               int32_t sample_rate,
                                               float threshold = 0.01f,
-                                              float min_silence_duration = 0.1f);
+                                              float min_silence_duration = 0.08f);
 
 bool load_audio(const std::string & path, AudioData & out, int32_t target_sample_rate = 0);
 bool load_audio_from_memory(const void * data, size_t bytes, AudioData & out, int32_t target_sample_rate = 0);

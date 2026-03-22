@@ -131,7 +131,7 @@ Provide a short reference clip (5–30 seconds, WAV or MP3) and a transcript of 
   -o output.wav
 ```
 
-By default, the engine keeps a small `8`-token floor before `EOS`, trims trailing silence from the final WAV, and peak-normalizes the output to `0.95`. All three behaviors are optional and can be overridden from the CLI.
+By default, the engine uses fish-speech-aligned sampling defaults: `--min-tokens-before-end 0`, no trailing-silence trim, no peak normalization, and no dynamic loudness normalization. All of these behaviors are optional and can be enabled from the CLI.
 
 ### GPU inference via Vulkan (AMD/Intel)
 
@@ -172,18 +172,19 @@ By default, the engine keeps a small `8`-token floor before `EOS`, trims trailin
 | `-v`, `--vulkan` | `-1` (CPU) | Vulkan device index (`-1` = CPU only) |
 | `-c`, `--cuda` | `-1` (CPU) | CUDA device index (`-1` = CPU only) |
 | `-threads N` | `4` | Number of CPU threads |
-| `-max-tokens N` | `512` | Max tokens to generate (~21s of audio per 440 tokens) |
-| `--min-tokens-before-end N` | `8` | Minimum generated tokens before `EOS` is allowed; use `0` to allow immediate stop |
-| `-temp F` | `0.7` | Sampling temperature |
-| `-top-p F` | `0.7` | Top-p nucleus sampling |
+| `-max-tokens N` | `1024` | Max tokens to generate |
+| `--min-tokens-before-end N` | `0` | Minimum generated tokens before `EOS` is allowed; `0` matches fish-speech default behavior |
+| `-temp F` | `0.8` | Sampling temperature |
+| `-top-p F` | `0.8` | Top-p nucleus sampling |
 | `-top-k N` | `30` | Top-k sampling |
-| `--trim-silence` / `--no-trim-silence` | `trim` enabled | Enable or disable trailing silence trimming on the saved WAV |
-| `--normalize` / `--no-normalize` | `normalize` enabled | Enable or disable peak normalization to `0.95` on the saved WAV |
+| `--dynamic-normalize` / `--no-dynamic-normalize` | `disabled` | Enable or disable dynamic RMS normalization |
+| `--trim-silence` / `--no-trim-silence` | `trim` disabled | Enable or disable trailing silence trimming on the saved WAV |
+| `--normalize` / `--no-normalize` | `normalize` disabled | Enable or disable peak normalization to `0.95` on the saved WAV |
 | `--server` | — | Start HTTP server instead of CLI synthesis |
 | `-H`, `--host` | `127.0.0.1` | Server bind address |
 | `-P`, `--port` | `3030` | Server port |
 
-Lower `--min-tokens-before-end` values reduce forced tail padding but increase the chance of very short outputs. Setting it to `0` gives the sampler full freedom to end immediately.
+Setting `--min-tokens-before-end 0` matches the upstream fish-speech behavior. Non-zero values deliberately bias the model away from early `EOS`.
 
 ---
 
@@ -202,9 +203,9 @@ Start the server:
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `text` | string | yes | Text to synthesize |
-| `reference` | file | no | Reference WAV for voice cloning |
-| `reference_text` | string | no | Transcript of the reference audio |
-| `params` | JSON string | no | Generation params: `max_new_tokens`, `temperature`, `top_p`, `top_k` |
+| `reference` | file | no | Reference audio file for voice cloning (WAV or MP3). Aliases: `reference_audio`, `prompt_audio`, `ref_audio` |
+| `reference_text` | string | if reference audio is provided | Transcript of the reference audio. Aliases: `ref_text`, `prompt_text` |
+| `params` | JSON string | no | Generation params: `max_new_tokens`, `temperature`, `top_p`, `top_k`, `min_tokens_before_end`, `n_threads`, `verbose` |
 
 Returns `audio/wav`.
 
@@ -222,6 +223,13 @@ curl -X POST http://127.0.0.1:3030/generate \
   --form "text=Text to synthesize in that voice." \
   --form 'params={"max_new_tokens":512,"temperature":0.58,"top_p":0.88,"top_k":40}' \
   -o output.wav
+
+# Same request using the accepted aliases
+curl -X POST http://127.0.0.1:3030/generate \
+  --form "reference_audio=@reference.wav" \
+  --form "ref_text=Transcript of the reference." \
+  --form "text=Text to synthesize in that voice." \
+  -o output.wav
 ```
 
 ---
@@ -235,7 +243,7 @@ curl -X POST http://127.0.0.1:3030/generate \
 | 5–7 GB | `q4_k_m` — best compact variant in current quick validation |
 | < 5 GB | `q3_k` or `q2_k` — experimental, quality drops faster |
 
-VRAM usage at runtime is approximately equal to the file size (transformer weights only; codec runs on CPU).
+VRAM usage at runtime is roughly on the order of the model size, but actual usage depends on backend buffers, KV cache length, and allocator overhead. The audio codec executes on CPU during inference.
 
 ---
 
@@ -267,7 +275,7 @@ The C++ engine (`src/`) is built entirely on [ggml](https://github.com/ggml-org/
 
 ### Long outputs
 
-Voice quality and amplitude tend to degrade after ~800 tokens (~37 s of audio). For longer texts, split into sentences and concatenate the resulting WAV files. By default, the engine applies dynamic loudness normalization (windowed RMS) and peak normalization on save to partially compensate, but splitting remains the most reliable approach.
+Voice quality and amplitude tend to degrade after ~800 tokens (~37 s of audio). For longer texts, split into sentences and concatenate the resulting WAV files. Optional post-processing flags such as `--dynamic-normalize`, `--normalize`, and `--trim-silence` can help clean up the result, but splitting remains the most reliable approach.
 
 ---
 

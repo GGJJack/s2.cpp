@@ -22,9 +22,9 @@ struct PipelineParams {
     GenerateParams gen;
     int32_t gpu_device = -1;   // -1 = CPU only
     int32_t backend_type = -1; //0 = Vulkan; 1 = Cuda;
-    bool trim_silence = true;
-    bool normalize_output = true;
-    bool normalize_dynamic = true;
+    bool trim_silence = false;
+    bool normalize_output = false;
+    bool normalize_dynamic = false;
 };
 
 class Pipeline {
