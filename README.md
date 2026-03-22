@@ -131,7 +131,7 @@ Provide a short reference clip (5–30 seconds, WAV or MP3) and a transcript of 
   -o output.wav
 ```
 
-By default, the engine keeps a small `8`-token floor before `EOS`, trims trailing silence from the final WAV, and peak-normalizes the output to `0.95`. All three behaviors are optional and can be overridden from the CLI.
+By default, the engine uses fish-speech-aligned sampling defaults: `--min-tokens-before-end 0`, no trailing-silence trim, no peak normalization, and no dynamic loudness normalization. All of these behaviors are optional and can be enabled from the CLI.
 
 ### GPU inference via Vulkan (AMD/Intel)
 
@@ -203,9 +203,9 @@ Start the server:
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `text` | string | yes | Text to synthesize |
-| `reference` | file | no | Reference WAV for voice cloning. Aliases: `reference_audio`, `prompt_audio`, `ref_audio` |
-| `reference_text` | string | no | Transcript of the reference audio. Aliases: `ref_text`, `prompt_text` |
-| `params` | JSON string | no | Generation params: `max_new_tokens`, `temperature`, `top_p`, `top_k` |
+| `reference` | file | no | Reference audio file for voice cloning (WAV or MP3). Aliases: `reference_audio`, `prompt_audio`, `ref_audio` |
+| `reference_text` | string | if reference audio is provided | Transcript of the reference audio. Aliases: `ref_text`, `prompt_text` |
+| `params` | JSON string | no | Generation params: `max_new_tokens`, `temperature`, `top_p`, `top_k`, `min_tokens_before_end`, `n_threads`, `verbose` |
 
 Returns `audio/wav`.
 
@@ -243,7 +243,7 @@ curl -X POST http://127.0.0.1:3030/generate \
 | 5–7 GB | `q4_k_m` — best compact variant in current quick validation |
 | < 5 GB | `q3_k` or `q2_k` — experimental, quality drops faster |
 
-VRAM usage at runtime is approximately equal to the file size (transformer weights only; codec runs on CPU).
+VRAM usage at runtime is roughly on the order of the model size, but actual usage depends on backend buffers, KV cache length, and allocator overhead. The audio codec executes on CPU during inference.
 
 ---
 
@@ -275,7 +275,7 @@ The C++ engine (`src/`) is built entirely on [ggml](https://github.com/ggml-org/
 
 ### Long outputs
 
-Voice quality and amplitude tend to degrade after ~800 tokens (~37 s of audio). For longer texts, split into sentences and concatenate the resulting WAV files. By default, the engine applies dynamic loudness normalization (windowed RMS) and peak normalization on save to partially compensate, but splitting remains the most reliable approach.
+Voice quality and amplitude tend to degrade after ~800 tokens (~37 s of audio). For longer texts, split into sentences and concatenate the resulting WAV files. Optional post-processing flags such as `--dynamic-normalize`, `--normalize`, and `--trim-silence` can help clean up the result, but splitting remains the most reliable approach.
 
 ---
 
