@@ -47,6 +47,7 @@ void print_uso() {
     safe_print("  --no-normalize              Keep original output peak level\n");
     safe_print("  --normalize                 Peak-normalize output WAV to 0.95\n");
     safe_print("  --server                    Start HTTP server\n");
+    safe_print("  --no-codec                  Skip vocoder loading (for /generate_tokens only)\n");
     safe_print("  -H, --host         <host>   Server host (default: 127.0.0.1)\n");
     safe_print("  -P, --port         <port>   Server port (default: 3030)\n");
     safe_print("  -h, --help                  Show this help\n");
@@ -133,6 +134,7 @@ int main(int argc, char** argv) {
         else if (arg == "--no-normalize")     { params.normalize_output = false; }
         else if (arg == "--normalize")        { params.normalize_output = true;  }
         else if (arg == "--server")           { use_server = true; }
+        else if (arg == "--no-codec")         { params.skip_codec = true; }
         else if (arg == "-H" || arg == "--host") { if (i+1 < argc) serverParams.host = argv[++i]; }
         else if (arg == "-P" || arg == "--port") { if (i+1 < argc) { try { serverParams.port = std::stoi(argv[++i]); } catch(...) {} } }
         else if (arg == "-h" || arg == "--help") { print_uso(); return 0; }

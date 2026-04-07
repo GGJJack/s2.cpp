@@ -181,6 +181,14 @@ namespace s2
 
         svr.Post("/generate", [&](const httplib::Request& req, httplib::Response& res)
             {
+                if (params.pipeline.skip_codec)
+                {
+                    json err = { {"error", "Server started with --no-codec. Use /generate_tokens instead."} };
+                    res.set_content(err.dump(), "application/json");
+                    res.status = 501;
+                    return;
+                }
+
                 PipelineParams pipelineParams;
                 pipelineParams.gen = params.pipeline.gen;
 

@@ -25,6 +25,7 @@ struct PipelineParams {
     bool trim_silence = false;
     bool normalize_output = false;
     bool normalize_dynamic = false;
+    bool skip_codec = false;   // --no-codec: skip vocoder loading (for /generate_tokens only)
 };
 
 class Pipeline {

@@ -30,7 +30,9 @@ bool Pipeline::init(const PipelineParams & params) {
         return false;
     }
 
-    if (!codec_.load(params.model_path, -1, -1)) {
+    if (params.skip_codec) {
+        safe_print_ln("Codec loading skipped (--no-codec).");
+    } else if (!codec_.load(params.model_path, -1, -1)) {
         safe_print_error_ln("Pipeline error: could not load codec from " + params.model_path);
         return false;
     }
