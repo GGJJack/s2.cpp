@@ -36,6 +36,11 @@ public:
     bool synthesize(const PipelineParams & params);
 
     bool synthesize_to_memory(const PipelineParams & params, void** ref_audio_buffer, size_t* ref_audio_size, void** wav_buffer, size_t* wav_size);
+
+    // LLM inference only — returns codec tokens without running vocoder.
+    // codes layout: (num_codebooks, n_frames) row-major int32.
+    bool synthesize_tokens(const PipelineParams & params, void** ref_audio_buffer, size_t* ref_audio_size, GenerateResult & result);
+
     bool synthesize_raw(const PipelineParams & params, AudioData & ref_audio, std::vector<float> & audio_out);
 
 private:

@@ -132,6 +132,69 @@ bool Pipeline::synthesize_to_memory(const PipelineParams & params, void** ref_au
     return true;
 }
 
+bool Pipeline::synthesize_tokens(const PipelineParams & params, void** ref_audio_buffer, size_t* ref_audio_size, GenerateResult & result) {
+    std::lock_guard<std::mutex> lock(synthesize_mutex_);
+
+    if (!initialized_) {
+        safe_print_error_ln("Pipeline not initialized.");
+        return false;
+    }
+
+    model_.clear_kv_cache();
+
+    safe_print_ln("--- Pipeline Synthesize Tokens (LLM only) ---");
+    safe_print_ln("Text: " + params.text);
+
+    const int32_t num_codebooks = model_.hparams().num_codebooks;
+
+    std::vector<int32_t> ref_codes;
+    int32_t T_prompt = 0;
+
+    AudioData ref_audio;
+    if (ref_audio_buffer && ref_audio_size && *ref_audio_buffer && *ref_audio_size > 0) {
+        if (params.prompt_text.empty()) {
+            safe_print_error_ln("Pipeline error: reference audio was provided without reference text.");
+            return false;
+        }
+        safe_print_ln("Loading reference audio...");
+        if (!load_audio_from_memory(*ref_audio_buffer, *ref_audio_size, ref_audio, codec_.sample_rate())) {
+            safe_print_error_ln("Pipeline warning: load_audio failed, running without reference audio.");
+        }
+    }
+
+    if (!ref_audio.samples.empty()) {
+        if (!codec_.encode(ref_audio.samples.data(), (int32_t)ref_audio.samples.size(),
+                           params.gen.n_threads, ref_codes, T_prompt)) {
+            safe_print_error_ln("Pipeline warning: encode failed, running without reference audio.");
+            ref_codes.clear();
+            T_prompt = 0;
+        }
+    }
+
+    PromptTensor prompt = build_prompt(
+        tokenizer_, params.text, params.prompt_text,
+        ref_codes.empty() ? nullptr : ref_codes.data(),
+        num_codebooks, T_prompt);
+
+    int32_t max_seq_len = prompt.cols + params.gen.max_new_tokens;
+    if (!model_.init_kv_cache(max_seq_len)) {
+        safe_print_error_ln("Pipeline error: init_kv_cache failed.");
+        return false;
+    }
+
+    result = generate(model_, tokenizer_.config(), prompt, params.gen);
+
+    model_.clear_kv_cache();
+
+    if (result.n_frames == 0) {
+        safe_print_error_ln("Pipeline error: generation produced no frames.");
+        return false;
+    }
+
+    safe_print_ln("Tokens generated: " + std::to_string(result.n_frames) + " frames x " + std::to_string(result.num_codebooks) + " codebooks");
+    return true;
+}
+
 bool Pipeline::synthesize_raw(const PipelineParams & params, AudioData & ref_audio, std::vector<float>& audio_out) {
     std::lock_guard<std::mutex> lock(synthesize_mutex_);
 

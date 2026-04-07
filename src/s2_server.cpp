@@ -69,6 +69,116 @@ namespace s2
                     << " -> " << res.status
                     << " (" << duration << "ms)" << std::endl; });
 
+        svr.Get("/health", [&](const httplib::Request&, httplib::Response& res)
+            {
+                json body;
+                body["status"] = "ok";
+                res.set_content(body.dump(), "application/json");
+                res.status = 200; });
+
+        svr.Post("/generate_tokens", [&](const httplib::Request& req, httplib::Response& res)
+            {
+                PipelineParams pipelineParams;
+                pipelineParams.gen = params.pipeline.gen;
+
+                if (!req.form.has_field("text"))
+                {
+                    json err = { {"error", "No text field in multipart form"} };
+                    res.set_content(err.dump(), "application/json");
+                    res.status = 400;
+                    return;
+                }
+
+                pipelineParams.text = req.form.get_field("text");
+
+                pipelineParams.prompt_text = get_first_form_field(
+                    req.form, {"reference_text", "ref_text", "prompt_text"});
+
+                if (req.form.has_field("params"))
+                {
+                    try {
+                        auto j = json::parse(req.form.get_field("params"));
+
+                        if (j.contains("max_new_tokens")) {
+                            int32_t val = j["max_new_tokens"].get<int32_t>();
+                            pipelineParams.gen.max_new_tokens = std::max(0, val);
+                        }
+                        if (j.contains("temperature")) {
+                            float val = j["temperature"].get<float>();
+                            pipelineParams.gen.temperature = std::max(0.0f, val);
+                        }
+                        if (j.contains("top_p")) {
+                            float val = j["top_p"].get<float>();
+                            pipelineParams.gen.top_p = std::max(0.0f, val);
+                        }
+                        if (j.contains("top_k")) {
+                            int32_t val = j["top_k"].get<int32_t>();
+                            pipelineParams.gen.top_k = std::max(0, val);
+                        }
+                        if (j.contains("min_tokens_before_end")) {
+                            int32_t val = j["min_tokens_before_end"].get<int32_t>();
+                            pipelineParams.gen.min_tokens_before_end = std::max(0, val);
+                        }
+                        if (j.contains("n_threads")) {
+                            int32_t val = j["n_threads"].get<int32_t>();
+                            pipelineParams.gen.n_threads = std::max(1, val);
+                        }
+                        if (j.contains("verbose")) {
+                            bool val = j["verbose"].get<bool>();
+                            pipelineParams.gen.verbose = val;
+                        }
+                    }
+                    catch (const json::parse_error& e) {
+                        json err = { {"error", "JSON parse error"} };
+                        res.set_content(err.dump(), "application/json");
+                        res.status = 400;
+                        return;
+                    }
+                }
+
+                const void* ref_audio_buffer = nullptr;
+                size_t ref_audio_size = 0;
+
+                httplib::FormData ref_file;
+                if (get_first_form_file(req.form, {"reference", "reference_audio", "prompt_audio", "ref_audio"}, ref_file)) {
+                    if (!ref_file.content.empty()) {
+                        ref_audio_buffer = ref_file.content.data();
+                        ref_audio_size = ref_file.content.size();
+                    }
+                }
+
+                if (ref_audio_buffer && ref_audio_size > 0 && pipelineParams.prompt_text.empty()) {
+                    res.status = 400;
+                    res.set_content("Reference audio requires reference_text (aliases: ref_text, prompt_text).", "text/plain");
+                    return;
+                }
+
+                GenerateResult result;
+                if (!pipeline.synthesize_tokens(pipelineParams, const_cast<void**>(&ref_audio_buffer), &ref_audio_size, result))
+                {
+                    std::cerr << "Token generation failed." << std::endl;
+                    res.status = 400;
+                    res.set_content("Token generation failed.", "text/plain");
+                    return;
+                }
+
+                if (result.codes.empty() || result.n_frames == 0)
+                {
+                    res.status = 400;
+                    res.set_content("No tokens generated.", "text/plain");
+                    return;
+                }
+
+                res.set_header("X-Num-Codebooks", std::to_string(result.num_codebooks));
+                res.set_header("X-Num-Frames", std::to_string(result.n_frames));
+
+                res.set_content(
+                    reinterpret_cast<const char*>(result.codes.data()),
+                    result.codes.size() * sizeof(int32_t),
+                    "application/octet-stream"
+                );
+                res.status = 200; });
+
         svr.Post("/generate", [&](const httplib::Request& req, httplib::Response& res)
             {
                 PipelineParams pipelineParams;
