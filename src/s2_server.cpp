@@ -136,21 +136,56 @@ namespace s2
                     }
                 }
 
+                // --- Pre-computed ref_codes path (from external GPU encoder) ---
                 const void* ref_audio_buffer = nullptr;
                 size_t ref_audio_size = 0;
 
-                httplib::FormData ref_file;
-                if (get_first_form_file(req.form, {"reference", "reference_audio", "prompt_audio", "ref_audio"}, ref_file)) {
-                    if (!ref_file.content.empty()) {
-                        ref_audio_buffer = ref_file.content.data();
-                        ref_audio_size = ref_file.content.size();
-                    }
-                }
+                httplib::FormData ref_codes_file;
+                if (get_first_form_file(req.form, {"ref_codes"}, ref_codes_file)
+                    && !ref_codes_file.content.empty())
+                {
+                    // Shape from headers (required)
+                    int32_t nc = 0, nf = 0;
+                    if (req.has_header("X-Num-Codebooks"))
+                        nc = std::stoi(req.get_header_value("X-Num-Codebooks"));
+                    if (req.has_header("X-Ref-Frames"))
+                        nf = std::stoi(req.get_header_value("X-Ref-Frames"));
 
-                if (ref_audio_buffer && ref_audio_size > 0 && pipelineParams.prompt_text.empty()) {
-                    res.status = 400;
-                    res.set_content("Reference audio requires reference_text (aliases: ref_text, prompt_text).", "text/plain");
-                    return;
+                    size_t expected_bytes = (size_t)nc * nf * sizeof(int32_t);
+                    if (nc <= 0 || nf <= 0 || ref_codes_file.content.size() != expected_bytes)
+                    {
+                        res.status = 400;
+                        res.set_content("ref_codes shape mismatch: expected X-Num-Codebooks * X-Ref-Frames * 4 bytes.", "text/plain");
+                        return;
+                    }
+                    if (pipelineParams.prompt_text.empty()) {
+                        res.status = 400;
+                        res.set_content("ref_codes requires reference_text (aliases: ref_text, prompt_text).", "text/plain");
+                        return;
+                    }
+
+                    pipelineParams.ref_codes.resize(nc * nf);
+                    std::memcpy(pipelineParams.ref_codes.data(),
+                                ref_codes_file.content.data(),
+                                expected_bytes);
+                    pipelineParams.ref_codes_frames = nf;
+                }
+                // --- Fallback: raw reference audio path (original) ---
+                else
+                {
+                    httplib::FormData ref_file;
+                    if (get_first_form_file(req.form, {"reference", "reference_audio", "prompt_audio", "ref_audio"}, ref_file)) {
+                        if (!ref_file.content.empty()) {
+                            ref_audio_buffer = ref_file.content.data();
+                            ref_audio_size = ref_file.content.size();
+                        }
+                    }
+
+                    if (ref_audio_buffer && ref_audio_size > 0 && pipelineParams.prompt_text.empty()) {
+                        res.status = 400;
+                        res.set_content("Reference audio requires reference_text (aliases: ref_text, prompt_text).", "text/plain");
+                        return;
+                    }
                 }
 
                 GenerateResult result;

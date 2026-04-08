@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 #include <mutex>
 
 namespace s2 {
@@ -26,6 +27,12 @@ struct PipelineParams {
     bool normalize_output = false;
     bool normalize_dynamic = false;
     bool skip_codec = false;   // --no-codec: skip vocoder loading (for /generate_tokens only)
+
+    // Pre-computed reference codes (from external encoder, e.g. Python GPU).
+    // Layout: (num_codebooks, T_prompt) row-major int32.
+    // When non-empty, synthesize_tokens() skips codec_.encode().
+    std::vector<int32_t> ref_codes;
+    int32_t ref_codes_frames = 0;   // T_prompt
 };
 
 class Pipeline {

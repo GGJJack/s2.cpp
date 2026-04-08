@@ -152,24 +152,37 @@ bool Pipeline::synthesize_tokens(const PipelineParams & params, void** ref_audio
     std::vector<int32_t> ref_codes;
     int32_t T_prompt = 0;
 
-    AudioData ref_audio;
-    if (ref_audio_buffer && ref_audio_size && *ref_audio_buffer && *ref_audio_size > 0) {
+    // Path A: pre-computed ref_codes supplied (e.g. from Python GPU encoder).
+    if (!params.ref_codes.empty() && params.ref_codes_frames > 0) {
         if (params.prompt_text.empty()) {
-            safe_print_error_ln("Pipeline error: reference audio was provided without reference text.");
+            safe_print_error_ln("Pipeline error: ref_codes provided without reference text.");
             return false;
         }
-        safe_print_ln("Loading reference audio...");
-        if (!load_audio_from_memory(*ref_audio_buffer, *ref_audio_size, ref_audio, codec_.sample_rate())) {
-            safe_print_error_ln("Pipeline warning: load_audio failed, running without reference audio.");
-        }
+        ref_codes = params.ref_codes;
+        T_prompt = params.ref_codes_frames;
+        safe_print_ln("Using pre-computed ref_codes: " + std::to_string(T_prompt) + " frames");
     }
+    // Path B: raw reference audio — encode via codec (original path).
+    else {
+        AudioData ref_audio;
+        if (ref_audio_buffer && ref_audio_size && *ref_audio_buffer && *ref_audio_size > 0) {
+            if (params.prompt_text.empty()) {
+                safe_print_error_ln("Pipeline error: reference audio was provided without reference text.");
+                return false;
+            }
+            safe_print_ln("Loading reference audio...");
+            if (!load_audio_from_memory(*ref_audio_buffer, *ref_audio_size, ref_audio, codec_.sample_rate())) {
+                safe_print_error_ln("Pipeline warning: load_audio failed, running without reference audio.");
+            }
+        }
 
-    if (!ref_audio.samples.empty()) {
-        if (!codec_.encode(ref_audio.samples.data(), (int32_t)ref_audio.samples.size(),
-                           params.gen.n_threads, ref_codes, T_prompt)) {
-            safe_print_error_ln("Pipeline warning: encode failed, running without reference audio.");
-            ref_codes.clear();
-            T_prompt = 0;
+        if (!ref_audio.samples.empty()) {
+            if (!codec_.encode(ref_audio.samples.data(), (int32_t)ref_audio.samples.size(),
+                               params.gen.n_threads, ref_codes, T_prompt)) {
+                safe_print_error_ln("Pipeline warning: encode failed, running without reference audio.");
+                ref_codes.clear();
+                T_prompt = 0;
+            }
         }
     }
 
